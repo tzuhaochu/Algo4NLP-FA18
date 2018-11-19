@@ -1,5 +1,5 @@
-<project name="assign1" default="build" basedir=".">
-  <property name="name" location="assign1"/>
+<project name="assign_lm" default="build" basedir=".">
+  <property name="name" location="assign_lm"/>
   <property environment="env"/>
 
   <target name="build">
@@ -14,7 +14,7 @@
       <compilerarg value="-Xlint:deprecation"/>
       <include name="**/*.java"/>
     </javac>
-    <jar destfile="${name}-submit.jar" basedir="build_assign1/src">
+    <jar destfile="submit.jar" basedir="build_assign1/src">
 	</jar>
 	<delete dir="build_assign1"/>
 	
