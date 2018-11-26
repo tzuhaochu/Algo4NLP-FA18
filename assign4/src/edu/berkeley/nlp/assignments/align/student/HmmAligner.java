@@ -6,7 +6,7 @@ import edu.berkeley.nlp.mt.WordAligner;
 
 public class HmmAligner implements WordAligner {
 
-    public HmmAligner(Iterable<SentencePair> trainingData){
+    public HmmAligner(Iterable<SentencePair> trainingData) {
 
     }
 
