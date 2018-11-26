@@ -14,7 +14,7 @@ public class HeuristicAlignerFactory implements WordAlignerFactory
 
 	public WordAligner newAligner(Iterable<SentencePair> trainingData) {
 
-		 return null;
+		 return new HeuristicAligner(trainingData);
 	}
 
 }
