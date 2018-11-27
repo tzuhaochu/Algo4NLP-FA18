@@ -39,18 +39,18 @@ public class HeuristicAligner implements WordAligner {
         List<String> enWords = sentencePair.getEnglishWords();
         for (int i = 0; i < frWords.size(); i++) {
             String frWord = frWords.get(i);
-            double maxP = 0.0;
-            int maxEPos = 0;
+            double maxScore = 0.0;
+            int maxEnPos = 0;
             for (int j = 0; j < enWords.size(); j++) {
                 String enWord = enWords.get(j);
                 Pair<String, String> pair = new Pair<>(frWord, enWord);
-                double P = feCounter.getCount(pair) / (eCounter.getCount(enWord) * fCounter.getCount(frWord));
-                if(maxP < P){
-                    maxP = P;
-                    maxEPos = j;
+                double score = feCounter.getCount(pair) / (eCounter.getCount(enWord) * fCounter.getCount(frWord));
+                if(maxScore < score){
+                    maxScore = score;
+                    maxEnPos = j;
                 }
             }
-            alignment.addAlignment(maxEPos, i, true);
+            alignment.addAlignment(maxEnPos, i, true);
         }
         return alignment;
     }
