@@ -122,8 +122,8 @@ public final class HmmAligner implements WordAligner {
     public Alignment alignSentencePair(SentencePair sentencePair) {
         List<String> frWords = sentencePair.getFrenchWords();
         List<String> enWords = sentencePair.getEnglishWords();
-        int Le = sentencePair.englishWords.size();
-        int Lf = sentencePair.frenchWords.size();
+        int Lf = frWords.size();
+        int Le = enWords.size();
         Alignment alignment = new Alignment();
         double[][] gamma = trainBySentence(frWords, enWords);
 
