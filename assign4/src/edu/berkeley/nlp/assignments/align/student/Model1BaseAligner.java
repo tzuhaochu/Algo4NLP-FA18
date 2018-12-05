@@ -10,7 +10,7 @@ import edu.berkeley.nlp.util.StringIndexer;
 import java.util.Arrays;
 import java.util.List;
 
-public class Model1Aligner implements WordAligner {
+public class Model1BaseAligner implements WordAligner {
 
     private static StringIndexer enIndexer = new StringIndexer();
     private static StringIndexer frIndexer = new StringIndexer();
@@ -23,7 +23,7 @@ public class Model1Aligner implements WordAligner {
     private double[] T;
     private int num_e, num_f, num_ef;
 
-    public Model1Aligner(Iterable<SentencePair> trainingData) {
+    public Model1BaseAligner(Iterable<SentencePair> trainingData) {
         // Indexing words
         enIndexer.add(NULL);
         for (SentencePair pair : trainingData) {
