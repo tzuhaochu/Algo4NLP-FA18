@@ -7,7 +7,7 @@ import edu.berkeley.nlp.mt.WordAlignerFactory;
 public class Model1AlignerFactory implements WordAlignerFactory {
 
     public WordAligner newAligner(Iterable<SentencePair> trainingData) {
-        return new Model1BaseAligner(trainingData);
+        return new Model1Aligner(trainingData);
     }
 
 }
