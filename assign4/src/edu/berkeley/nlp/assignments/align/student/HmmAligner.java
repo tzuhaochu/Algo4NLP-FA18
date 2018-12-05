@@ -12,7 +12,7 @@ public final class HmmAligner implements WordAligner {
     private static StringIndexer enIndexer = new StringIndexer();
     private static StringIndexer frIndexer = new StringIndexer();
     private static Indexer<Pair<String, String>> pairIndexer = new Indexer<>();
-    private final static int MAX_ITER = 20;
+    private final static int MAX_ITER = 5;
     private final static double DISTORTION_LIKELIHOOD = 0.2;
     private final static int NID = -1;
 
@@ -77,12 +77,12 @@ public final class HmmAligner implements WordAligner {
         // forward
         int fid0 = frIndexer.indexOf(frWords.get(0));
         double norm = 0;
-        for (int j = 0; j < Le; j++) {
+        for (int j = 0; j <= Le; j++) {
             int eid = j == Le ? -1 : enIndexer.indexOf(enWords.get(j));
             alpha[0][j] = theta.getCount(eid, fid0) * P[j][Le];
             norm += alpha[0][j];
         }
-        if (norm != 0) for (int j = 0; j <= Le; j++) alpha[0][j] /= norm;
+        if (norm > 0) for (int j = 0; j <= Le; j++) alpha[0][j] /= norm;
 
         for (int i = 1; i < Lf; i++) {
             int fid = frIndexer.indexOf(frWords.get(i));
