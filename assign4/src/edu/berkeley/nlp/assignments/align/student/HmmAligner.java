@@ -5,8 +5,6 @@ import edu.berkeley.nlp.mt.SentencePair;
 import edu.berkeley.nlp.mt.WordAligner;
 import edu.berkeley.nlp.util.*;
 
-import java.lang.reflect.Array;
-import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 
@@ -19,11 +17,11 @@ public final class HmmAligner implements WordAligner {
     private final static int NID = -1;
 
     private int num_e, num_f, num_ef;
-    private CounterMap<Integer, Integer> efCounter;
+    private CounterMap<Integer, Integer> theta;
 
     public HmmAligner(Iterable<SentencePair> trainingData) {
-        efCounter = new CounterMap<>();
         // Indexing words
+        theta = new CounterMap<>();
         for (SentencePair pair : trainingData) {
             List<String> frWords = pair.getFrenchWords();
             List<String> enWords = pair.getEnglishWords();
@@ -34,18 +32,18 @@ public final class HmmAligner implements WordAligner {
             for (String f : frWords) frIndexer.add(f);
             for (String f : frWords) {
                 int fid = frIndexer.indexOf(f);
-                efCounter.setCount(NID, fid, 1);
+                theta.setCount(NID, fid, 1);
                 for (String e : enWords) {
                     int eid = enIndexer.indexOf(e);
                     pairIndexer.add(new Pair<>(e, f));
-                    efCounter.incrementCount(eid, fid, 1);
+                    theta.incrementCount(eid, fid, 1);
                 }
             }
         }
         num_e = enIndexer.size();
         num_f = frIndexer.size();
         num_ef = pairIndexer.size();
-        efCounter.normalize();
+        theta.normalize();
         System.out.println("e|f number: " + num_ef);
         System.out.println("e number: " + num_e);
         System.out.println("f number: " + num_f);
@@ -54,59 +52,47 @@ public final class HmmAligner implements WordAligner {
         trainHMM(trainingData);
     }
 
-    private double[][] getGamma(List<String> frWords, List<String> enWords) {
+    private double[][] trainBySentence(List<String> frWords, List<String> enWords) {
         int Lf = frWords.size();
         int Le = enWords.size();
 
         double[][] alpha = new double[Lf][Le + 1];
-        double[][] gamma = new double[Lf][Le + 1];
+        double[][] beta = new double[Lf][Le + 1];
+        double[] Z = new double[Le + 1];
 
-        double[][] trans = new double[Le + 1][Le + 1];
+        double[][] P = new double[Le + 1][Le + 1];
         for (int i = 0; i < Le; i++) {
-            trans[i][Le] = DISTORTION_LIKELIHOOD;
-            trans[Le][i] = (1 - DISTORTION_LIKELIHOOD) / Le;
+            P[i][Le] = DISTORTION_LIKELIHOOD;
+            P[Le][i] = (1 - DISTORTION_LIKELIHOOD) / Le;
             double norm = 0;
             for (int j = 0; j < Le; j++) {
-                trans[i][j] = Math.exp(- 2 * Math.abs(j - i - 1.1));
-                norm += trans[i][j];
+                P[i][j] = Math.exp(- 2 * Math.abs(j - i - 1.1));
+                norm += P[i][j];
             }
             for (int j = 0; j < Le; j++) {
-                trans[i][j] = trans[i][j] * (1 - DISTORTION_LIKELIHOOD) / norm;
+                P[i][j] = P[i][j] * (1 - DISTORTION_LIKELIHOOD) / norm;
             }
         }
 
-        int fstFid = frIndexer.addAndGetIndex(frWords.get(0));
-
-        // Generate the English word index. Use the last one as NULL
-        // alignment. Also set the initial alpha.
-        double normAlphaZero = 0;
+        // forward
+        int fid0 = frIndexer.indexOf(frWords.get(0));
+        double norm = 0;
         for (int j = 0; j < Le; j++) {
-            String e = enWords.get(j);
-            int eid = enIndexer.indexOf(e);
-            alpha[0][j] = efCounter.getCount(eid, fstFid) * trans[j][Le];
-            normAlphaZero += alpha[0][j];
+            int eid = j == Le ? -1 : enIndexer.indexOf(enWords.get(j));
+            alpha[0][j] = theta.getCount(eid, fid0) * P[j][Le];
+            norm += alpha[0][j];
         }
+        if (norm != 0) for (int j = 0; j <= Le; j++) alpha[0][j] /= norm;
 
-        alpha[0][Le] = efCounter.getCount(-1, fstFid) * trans[Le][Le];
-        normAlphaZero += alpha[0][Le];
-        if (normAlphaZero != 0) {
-            for (int j = 0; j <= Le; j++) {
-                alpha[0][j] /= normAlphaZero;
-            }
-        }
-
-        // Calculate alpha by going forward.
         for (int i = 1; i < Lf; i++) {
-            String f = frWords.get(i);
-            int fid = frIndexer.indexOf(f);
-            double norm = 0;
-
+            int fid = frIndexer.indexOf(frWords.get(i));
+            norm = 0;
             for (int j1 = 0; j1 <= Le; j1++) {
                 int eid = j1 == Le ? -1 : enIndexer.indexOf(enWords.get(j1));
                 for (int j2 = 0; j2 <= Le; j2++) {
-                    alpha[i][j1] += alpha[i - 1][j2] * trans[j2][j1];
+                    alpha[i][j1] += alpha[i - 1][j2] * P[j2][j1];
                 }
-                alpha[i][j1] *= efCounter.getCount(eid, fid);
+                alpha[i][j1] *= theta.getCount(eid, fid);
                 norm += alpha[i][j1];
             }
             if (norm > 0) {
@@ -116,53 +102,55 @@ public final class HmmAligner implements WordAligner {
             }
         }
 
-        System.arraycopy(alpha[Lf - 1], 0, gamma[Lf - 1], 0, Le);
-        double[] normFactors = new double[Le + 1];
+        System.arraycopy(alpha[Lf - 1], 0, beta[Lf - 1], 0, Le);
 
+        // backward
         for (int i = Lf - 2; i >= 0; i--) {
             for (int j1 = 0; j1 <= Le; j1++) {
                 for (int j2 = 0; j2 <= Le; j2++) {
-                    normFactors[j1] += alpha[i][j2] * trans[j2][j1];
+                    Z[j1] += alpha[i][j2] * P[j2][j1];
                 }
             }
             for (int j1 = 0; j1 <= Le; j1++) {
                 for (int j2 = 0; j2 <= Le; j2++) {
-                    if (normFactors[j2] == 0) {
-                        gamma[i][j1] = 0;
+                    if (Z[j2] == 0) {
+                        beta[i][j1] = 0;
                     } else {
-                        gamma[i][j1] += alpha[i][j1] * trans[j1][j2] * gamma[i + 1][j2] / normFactors[j2];
+                        beta[i][j1] += alpha[i][j1] * P[j1][j2] * beta[i + 1][j2] / Z[j2];
                     }
                 }
             }
         }
 
-        return gamma;
+        return beta;
     }
 
     private void trainHMM(Iterable<SentencePair> trainingData) {
+        System.out.println("Start training...");
         for (int iter = 0; iter < MAX_ITER; iter++) {
-            CounterMap<Integer, Integer> tmpCounter = new CounterMap<>();
+            CounterMap<Integer, Integer> tmpTheta = new CounterMap<>();
             for (SentencePair pair : trainingData) {
                 List<String> frWords = pair.getFrenchWords();
                 List<String> enWords = pair.getEnglishWords();
-                double[][] gamma = getGamma(frWords, enWords);
+                double[][] gamma = trainBySentence(frWords, enWords);
                 for (int i = 0; i < frWords.size(); i++) {
                     String f = frWords.get(i);
                     int fid = frIndexer.indexOf(f);
                     for (int j = 0; j < enWords.size(); j++) {
                         String e = enWords.get(j);
                         int eid = enIndexer.indexOf(e);
-                        tmpCounter.incrementCount(eid, fid, gamma[i][j]);
+                        tmpTheta.incrementCount(eid, fid, gamma[i][j]);
                     }
                 }
             }
-            for (Integer k : tmpCounter.keySet()) {
-                Counter<Integer> counter = tmpCounter.getCounter(k);
+            for (Integer k : tmpTheta.keySet()) {
+                Counter<Integer> counter = tmpTheta.getCounter(k);
                 if (counter.totalCount() > 0) {
                     counter.normalize();
                 }
             }
-            efCounter = tmpCounter;
+            theta = tmpTheta;
+            System.out.println(String.format("ITER: %02d/%02d", iter, MAX_ITER));
         }
     }
 
@@ -173,7 +161,7 @@ public final class HmmAligner implements WordAligner {
         int Le = sentencePair.englishWords.size();
         int Lf = sentencePair.frenchWords.size();
         Alignment alignment = new Alignment();
-        double[][] gamma = getGamma(frWords, enWords);
+        double[][] gamma = trainBySentence(frWords, enWords);
 
         for (int i = 0; i < Lf; i++) {
             int maxEnPos = Le;
