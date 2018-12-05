@@ -44,10 +44,10 @@ public class Model1Aligner implements WordAligner {
         System.out.println("f number: " + num_f);
 
         // EM Training
-        em1(trainingData);
+        trainEM1(trainingData);
     }
 
-    private void em1(Iterable<SentencePair> trainingData){
+    private void trainEM1(Iterable<SentencePair> trainingData){
         double[] c_p = new double[num_ef];
         double[] c_e = new double[num_e];
         T = new double[num_ef];
@@ -99,7 +99,7 @@ public class Model1Aligner implements WordAligner {
         }
     }
 
-    private void em2(Iterable<SentencePair> trainingData){
+    private void trainEM2(Iterable<SentencePair> trainingData){
         double[] count = new double[num_ef];
         double[] total = new double[num_f];
         double[] total_s = new double[num_e];
@@ -167,14 +167,13 @@ public class Model1Aligner implements WordAligner {
             int maxEnPos = 0;
             for (int j = 0; j < enWords.size(); j++) {
                 String e = enWords.get(j);
-                int eid = enIndexer.indexOf(e);
                 int pid = pairIndexer.indexOf(new Pair<>(e, f));
                 if (maxScore < T[pid]) {
                     maxScore = T[pid];
                     maxEnPos = j;
                 }
             }
-            alignment.addAlignment(maxEnPos, i, true);
+            alignment.addAlignment(maxEnPos-1, i, true);
         }
         return alignment;
     }
