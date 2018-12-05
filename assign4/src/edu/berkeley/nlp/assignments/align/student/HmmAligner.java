@@ -13,7 +13,7 @@ public final class HmmAligner implements WordAligner {
     private final static int MAX_ITER = 20;
     private final static double TOLERANCE0 = 1e-5;
     private final static double TOLERANCE1 = 5e-2;
-    private final static double DISTORTION_LIKELIHOOD = 0.2;
+    private final static double EPSILON = 0.2;
     private final static int NID = -1;
 
     private CounterMap<Integer, Integer> T;
@@ -51,15 +51,15 @@ public final class HmmAligner implements WordAligner {
         double[][] P = new double[Le + 1][Le + 1];
 
         for (int i = 0; i < Le; i++) {
-            P[i][Le] = DISTORTION_LIKELIHOOD;
-            P[Le][i] = (1 - DISTORTION_LIKELIHOOD) / Le;
+            P[i][Le] = EPSILON;
+            P[Le][i] = (1 - EPSILON) / Le;
             double norm = 0;
             for (int j = 0; j < Le; j++) {
                 P[i][j] = Math.exp(-2 * Math.abs(j - i - 1.1));
                 norm += P[i][j];
             }
             for (int j = 0; j < Le; j++) {
-                P[i][j] = P[i][j] * (1 - DISTORTION_LIKELIHOOD) / norm;
+                P[i][j] = P[i][j] * (1 - EPSILON) / norm;
             }
         }
 
@@ -116,17 +116,9 @@ public final class HmmAligner implements WordAligner {
             }
 
             // Computing delta
-            int convergedNum = 0;
-            int totalNum = 0;
-            for (Integer k : T.keySet()) {
-                for (Integer v : T.getCounter(k).keySet()) {
-                    totalNum += 1;
-                    if (Math.abs(pre_T.getCount(k, v) - T.getCount(k, v)) < TOLERANCE0) convergedNum += 1;
-                }
-            }
-            delta = 1.0 - (double) convergedNum / totalNum;
-            T = pre_T;
+            delta = Utils.computeDiff(T, pre_T, TOLERANCE0);
             System.out.println(String.format("ITER: %02d/%02d\tdelta: %1.10f > %f", iter+1, MAX_ITER, delta, TOLERANCE1));
+            T = pre_T;
         }
     }
 
@@ -138,7 +130,6 @@ public final class HmmAligner implements WordAligner {
         int Le = enWords.size();
         Alignment alignment = new Alignment();
         double[][] score = computeScore(frWords, enWords);
-
         for (int i = 0; i < Lf; i++) {
             int maxEnPos = Le;
             double maxScore = score[i][Le];

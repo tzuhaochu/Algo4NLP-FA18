@@ -14,7 +14,7 @@ public class Model1Aligner implements WordAligner {
     private final static double TOLERANCE0 = 1e-5;
     private final static double TOLERANCE1 = 0.15;
     private final static int MAX_ITER = 30;
-    private final static double DISTORTION_LIKELIHOOD = 0.28;
+    private final static double EPSILON = 0.28;
     private final static int NID = -1;
 
     private CounterMap<Integer, Integer> T;
@@ -69,11 +69,11 @@ public class Model1Aligner implements WordAligner {
                     double total_s = 0;
                     for (int i = 0; i < Le; i++) {
                         int eid = enIndexer.indexOf(enWords.get(i));
-                        double d = prior(Le) * T.getCount(eid, fid);
+                        double d = (1.0 - EPSILON) / (Le + 1) * T.getCount(eid, fid);
                         Z[i] = d;
                         total_s += d;
                     }
-                    Z[Le] = DISTORTION_LIKELIHOOD * T.getCount(-1, fid);
+                    Z[Le] = EPSILON * T.getCount(-1, fid);
                     total_s += Z[Le];
                     for (int i = 0; i <= Le; i++) {
                         int eid = i == Le ? NID : enIndexer.indexOf(enWords.get(i));
@@ -85,22 +85,10 @@ public class Model1Aligner implements WordAligner {
             pre_T.normalize();
 
             // Computing delta
-            int convergedNum = 0;
-            int totalNum = 0;
-            for (Integer k : T.keySet()) {
-                for (Integer v : T.getCounter(k).keySet()) {
-                    totalNum += 1;
-                    if (Math.abs(pre_T.getCount(k, v) - T.getCount(k, v)) < TOLERANCE0) convergedNum += 1;
-                }
-            }
-            delta = 1.0 - (double) convergedNum / totalNum;
-            T = pre_T;
+            delta = Utils.computeDiff(T, pre_T, TOLERANCE0);
             System.out.println(String.format("ITER: %02d/%02d\tdelta: %1.10f > %f", iter+1, MAX_ITER, delta, TOLERANCE1));
+            T = pre_T;
         }
-    }
-
-    private double prior(int Le) {
-        return (1.0 - DISTORTION_LIKELIHOOD) / (Le + 1);
     }
 
     @Override
@@ -112,11 +100,11 @@ public class Model1Aligner implements WordAligner {
         Alignment alignment = new Alignment();
         for (int j = 0; j < Lf; j++) {
             int fid = frIndexer.indexOf(frWords.get(j));
-            double maxScore = DISTORTION_LIKELIHOOD * T.getCount(-1, fid);
+            double maxScore = EPSILON * T.getCount(-1, fid);
             int maxEnPos = Le;
             for (int i = 0; i < Le; i++) {
                 int eid = enIndexer.indexOf(enWords.get(i));
-                double score = prior(Le) * T.getCount(eid, fid);
+                double score = (1.0 - EPSILON) / (Le + 1) * T.getCount(eid, fid);
                 if (score > maxScore) {
                     maxScore = score;
                     maxEnPos = i;
