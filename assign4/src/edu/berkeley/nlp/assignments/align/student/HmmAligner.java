@@ -13,14 +13,16 @@ public final class HmmAligner implements WordAligner {
     private final static int MAX_ITER = 20;
     private final static double TOLERANCE0 = 1e-5;
     private final static double TOLERANCE1 = 5e-2;
-    private final static double EPSILON = 0.2;
+    private final static double EPSILON = 0.9;
     private final static int NID = -1;
+    private final static double A = 1.7;
+    private final static double B = 1.1;
 
-    private CounterMap<Integer, Integer> T;
+    private CounterMap<Integer, Integer> theta;
 
     public HmmAligner(Iterable<SentencePair> trainingData) {
         // Indexing words
-        T = new CounterMap<>();
+        theta = new CounterMap<>();
         for (SentencePair pair : trainingData) {
             List<String> frWords = pair.getFrenchWords();
             List<String> enWords = pair.getEnglishWords();
@@ -29,14 +31,14 @@ public final class HmmAligner implements WordAligner {
             for (String f : frWords) frIndexer.add(f);
             for (String f : frWords) {
                 int fid = frIndexer.indexOf(f);
-                T.setCount(NID, fid, 1);
+                theta.setCount(NID, fid, 1);
                 for (String e : enWords) {
                     int eid = enIndexer.indexOf(e);
-                    T.incrementCount(eid, fid, 1);
+                    theta.incrementCount(eid, fid, 1);
                 }
             }
         }
-        T.normalize();
+        theta.normalize();
 
         // HMM training
         trainHMM(trainingData);
@@ -48,18 +50,18 @@ public final class HmmAligner implements WordAligner {
         double[][] alpha = new double[Lf][Le + 1];
         double[][] score = new double[Lf][Le + 1];
         double[] Z = new double[Le + 1];
-        double[][] P = new double[Le + 1][Le + 1];
+        double[][] psi = new double[Le + 1][Le + 1];
 
         for (int i = 0; i < Le; i++) {
-            P[i][Le] = EPSILON;
-            P[Le][i] = (1 - EPSILON) / Le;
+            psi[i][Le] = EPSILON;
+            psi[Le][i] = (1 - EPSILON) / Le;
             double norm = 0;
             for (int j = 0; j < Le; j++) {
-                P[i][j] = Math.exp(-2 * Math.abs(j - i - 1.1));
-                norm += P[i][j];
+                psi[i][j] = Math.exp(- A * Math.abs(j - i - B));
+                norm += psi[i][j];
             }
             for (int j = 0; j < Le; j++) {
-                P[i][j] = P[i][j] * (1 - EPSILON) / norm;
+                psi[i][j] = psi[i][j] * (1 - EPSILON) / norm;
             }
         }
 
@@ -69,9 +71,9 @@ public final class HmmAligner implements WordAligner {
             double norm = 0;
             for (int j1 = 0; j1 <= Le; j1++) {
                 int eid = j1 == Le ? NID : enIndexer.indexOf(enWords.get(j1));
-                if (i == 0) alpha[i][j1] = P[j1][Le];
-                else for (int j2 = 0; j2 <= Le; j2++) alpha[i][j1] += alpha[i - 1][j2] * P[j2][j1];
-                alpha[i][j1] *= T.getCount(eid, fid);
+                if (i == 0) alpha[i][j1] = psi[j1][Le];
+                else for (int j2 = 0; j2 <= Le; j2++) alpha[i][j1] += alpha[i - 1][j2] * psi[j2][j1];
+                alpha[i][j1] *= theta.getCount(eid, fid);
                 norm += alpha[i][j1];
             }
             if (norm > 0) for (int j = 0; j <= Le; j++) alpha[i][j] /= norm;
@@ -83,10 +85,10 @@ public final class HmmAligner implements WordAligner {
         for (int i = Lf - 2; i >= 0; i--) {
             for (int j1 = 0; j1 <= Le; j1++)
                 for (int j2 = 0; j2 <= Le; j2++)
-                    Z[j1] += alpha[i][j2] * P[j2][j1];
+                    Z[j1] += alpha[i][j2] * psi[j2][j1];
             for (int j1 = 0; j1 <= Le; j1++)
                 for (int j2 = 0; j2 <= Le; j2++)
-                    score[i][j1] = Z[j2] == 0 ? 0 : score[i][j1] + alpha[i][j1] * P[j1][j2] * score[i + 1][j2] / Z[j2];
+                    score[i][j1] = Z[j2] == 0 ? 0 : score[i][j1] + alpha[i][j1] * psi[j1][j2] * score[i + 1][j2] / Z[j2];
         }
 
         return score;
@@ -95,7 +97,7 @@ public final class HmmAligner implements WordAligner {
     private void trainHMM(Iterable<SentencePair> trainingData) {
         double delta = Double.MAX_VALUE;
         for (int iter = 0; iter < MAX_ITER  && delta > TOLERANCE1; iter++) {
-            CounterMap<Integer, Integer> pre_T = new CounterMap<>();
+            CounterMap<Integer, Integer> new_theta = new CounterMap<>();
             for (SentencePair pair : trainingData) {
                 List<String> frWords = pair.getFrenchWords();
                 List<String> enWords = pair.getEnglishWords();
@@ -104,21 +106,21 @@ public final class HmmAligner implements WordAligner {
                     int fid = frIndexer.indexOf(frWords.get(i));
                     for (int j = 0; j < enWords.size(); j++) {
                         int eid = enIndexer.indexOf(enWords.get(j));
-                        pre_T.incrementCount(eid, fid, score[i][j]);
+                        new_theta.incrementCount(eid, fid, score[i][j]);
                     }
                 }
             }
-            for (Integer k : pre_T.keySet()) {
-                Counter<Integer> counter = pre_T.getCounter(k);
+            for (Integer k : new_theta.keySet()) {
+                Counter<Integer> counter = new_theta.getCounter(k);
                 if (counter.totalCount() > 0) {
                     counter.normalize();
                 }
             }
 
             // Computing delta
-            delta = Utils.computeDiff(T, pre_T, TOLERANCE0);
+            delta = Utils.computeDiff(theta, new_theta, TOLERANCE0);
             System.out.println(String.format("ITER: %02d/%02d\tdelta: %1.10f > %f", iter+1, MAX_ITER, delta, TOLERANCE1));
-            T = pre_T;
+            theta = new_theta;
         }
     }
 

@@ -10,10 +10,9 @@ import edu.berkeley.nlp.mt.decoder.DecoderFactory;
 import edu.berkeley.nlp.mt.decoder.DistortionModel;
 import edu.berkeley.nlp.mt.phrasetable.PhraseTable;
 
-public class HmmAlignerFactory implements WordAlignerFactory
-{
+public class HmmAlignerFactory implements WordAlignerFactory {
 
-	public WordAligner newAligner(Iterable<SentencePair> trainingData) {
-		 return new HmmAligner(trainingData);
-	}
+    public WordAligner newAligner(Iterable<SentencePair> trainingData) {
+        return new CoHmmAligner(trainingData);
+    }
 }
