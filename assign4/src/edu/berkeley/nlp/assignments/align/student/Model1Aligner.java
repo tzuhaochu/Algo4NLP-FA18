@@ -14,7 +14,7 @@ public class Model1Aligner implements WordAligner {
     private final static double TOLERANCE0 = 1e-5;
     private final static double TOLERANCE1 = 0.15;
     private final static int MAX_ITER = 30;
-    private final static double EPSILON = 0.28;
+    private final static double ALPHA = 0.2;
     private final static int NID = -1;
 
     private CounterMap<Integer, Integer> T;
@@ -69,11 +69,11 @@ public class Model1Aligner implements WordAligner {
                     double total_s = 0;
                     for (int i = 0; i < Le; i++) {
                         int eid = enIndexer.indexOf(enWords.get(i));
-                        double d = (1.0 - EPSILON) / (Le + 1) * T.getCount(eid, fid);
+                        double d = (1.0 - ALPHA) / (Le + 1) * T.getCount(eid, fid);
                         Z[i] = d;
                         total_s += d;
                     }
-                    Z[Le] = EPSILON * T.getCount(-1, fid);
+                    Z[Le] = ALPHA * T.getCount(-1, fid);
                     total_s += Z[Le];
                     for (int i = 0; i <= Le; i++) {
                         int eid = i == Le ? NID : enIndexer.indexOf(enWords.get(i));
@@ -100,11 +100,11 @@ public class Model1Aligner implements WordAligner {
         Alignment alignment = new Alignment();
         for (int j = 0; j < Lf; j++) {
             int fid = frIndexer.indexOf(frWords.get(j));
-            double maxScore = EPSILON * T.getCount(-1, fid);
+            double maxScore = ALPHA * T.getCount(-1, fid);
             int maxEnPos = Le;
             for (int i = 0; i < Le; i++) {
                 int eid = enIndexer.indexOf(enWords.get(i));
-                double score = (1.0 - EPSILON) / (Le + 1) * T.getCount(eid, fid);
+                double score = (1.0 - ALPHA) / (Le + 1) * T.getCount(eid, fid);
                 if (score > maxScore) {
                     maxScore = score;
                     maxEnPos = i;

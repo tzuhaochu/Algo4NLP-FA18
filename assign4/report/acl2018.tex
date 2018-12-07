@@ -1,0 +1,231 @@
+%
+% File acl2018.tex
+%
+%% Based on the style files for ACL-2017, with some changes, which were, in turn,
+%% Based on the style files for ACL-2015, with some improvements
+%%  taken from the NAACL-2016 style
+%% Based on the style files for ACL-2014, which were, in turn,
+%% based on ACL-2013, ACL-2012, ACL-2011, ACL-2010, ACL-IJCNLP-2009,
+%% EACL-2009, IJCNLP-2008...
+%% Based on the style files for EACL 2006 by 
+%%e.agirre@ehu.es or Sergi.Balari@uab.es
+%% and that of ACL 08 by Joakim Nivre and Noah Smith
+
+\documentclass[11pt,a4paper]{article}
+\usepackage[hyperref]{acl2018}
+\usepackage{times}
+\usepackage{latexsym}
+\usepackage{amsfonts}
+\usepackage{amsmath}
+\usepackage{enumerate}
+\usepackage{url}
+\usepackage{makecell}
+\usepackage{multirow}% http://ctan.org/pkg/multirow
+\usepackage{hhline}% http://ctan.org/pkg/hhline
+
+\aclfinalcopy % Uncomment this line for the final submission
+%\def\aclpaperid{***} %  Enter the acl Paper ID here
+
+%\setlength\titlebox{5cm}
+% You can expand the titlebox if you need extra space
+% to show all the authors. Please do not make the titlebox
+% smaller than 5cm (the original size); we will check this
+% in the camera-ready version and ask you to change it back.
+
+\newcommand\BibTeX{B{\sc ib}\TeX}
+\newcommand\reserved{{\color{red} XXX }}
+
+\title{11-711 Project 4}
+
+\author{Hengruo Zhang \\
+  Electrical \& Computer Engineering \\
+  Carnegie Mellon University \\
+  5000 Forbes Avenue \\
+  {\tt hengruoz@andrew.cmu.edu} \\}
+
+\date{}
+
+\begin{document}
+\maketitle
+% \begin{abstract}
+  
+% \end{abstract}
+
+\section{Introduction}
+In this project, we have implemented three word alignment models: a heuristic aligner, IBM Model 1 aligner, and an HMM aligner. Trained on 10,000 sentence pairs, the IBM Model 1 aligner gets 0.32 AER and 12.671 BLEU, and the HMM aligner gets 0.17 AER and 19.062 BLEU. Trained on 1,000,000 sentence pairs, the IBM Model 1 aligner gets 0.28 AER and 24.466 BLEU, and the HMM aligner gets 0.11 AER and 29.523 BLEU. 
+
+\section{Heuristic Aligner}
+The algorithm of our heuristic aligner is to maximize the ratio $c(f,e)/(c(e)\cdot c(f))$, where $c(x)$ is the number of $x$. We tested it with different sizes of training set and got the results in Table \ref{tab:heu}.
+
+\begin{table}[h!]
+  \begin{center}
+  \begin{tabular}{|c|c|c|}
+  \hline 
+  \bf Size & \bf AER & \bf BLEU \\ 
+  \hline
+  $10^3$ & 0.73 & 4.84 \\
+  \hline
+  $10^4$ & 0.62 & 11.95 \\
+  \hline
+  $10^5$ & 0.49 & 18.87 \\
+  \hline
+  $10^6$ & 0.40 & 24.26 \\
+  \hline
+  \end{tabular}
+  \end{center}
+  \caption{Results of the heuristic aligner}
+  \label{tab:heu}
+\end{table}
+
+\section{IBM Model 1 Aligner}
+
+\subsection{Overview}
+
+The basic formala for word alignment is 
+\[
+  P(\mathbf{f},a\mid \mathbf{e}) = \prod\limits_i P(a_j = i\mid j, |\mathbf{e}|, |\mathbf{f}|) P(f_j\mid e_i)
+\] where $a$ is an alignment. Our training objective is to solve
+\begin{align*}
+  \theta &= \arg\max\limits_\theta p(\mathbf{f} | \mathbf{e}, \theta) = \arg\max\limits_\theta \sum\limits_\mathbf{a} p(\mathbf{f}, \mathbf{a}| \mathbf{e}, \theta) \\
+  &= \sum\limits_\mathbf{a}\prod\limits_j p(a_j = i|f_j,e_i,\theta)p(f_j|e_i,\theta)
+\end{align*}
+The assumption of IBM Model 1 is that $P(a_j = i\mid j, |\mathbf{e}|, |\mathbf{f}|) = \dfrac{1-\alpha}{|\mathbf{e}|}$ for a non-null position, i.e., all positions are equally likely, and $
+  P(a_j = \text{NULL}\mid j, |\mathbf{e}|, |\mathbf{f}|) = \beta$. For simplification, we can set $\alpha = \beta$.
+
+\subsection{Implementation}
+We implemented an intersected IBM Model 1 with $\alpha = 0.2$ and about 15 training iterations (depending on the converging tolerance). Table \ref{tab:ibm-size} is the comparison between the single model and the intersected model with different sizes of the training dataset.
+\begin{table}[h!]
+  \begin{center}
+  \begin{tabular}{|c|c|c|c|c|}
+  \hline 
+  \bf Model & \bf Size &\bf AER & \bf BLEU & \bf Time(s) \\ 
+  \hline
+  \multirow{4}{*}{Single} & $10^3$ & 0.44 & 7.827 & 11 \\
+  \hhline{~----} & $10^4$ & 0.35 & 14.986 & 56 \\
+  
+  \hhline{~----} & $10^5$ & 0.31 & 18.862 & 417 \\
+  
+  \hhline{~----} & $10^6$ & 0.28 & 24.466 & 3912 \\
+  \hline
+  \multirow{4}{*}{Intersected} & $10^3$ & 0.39 & 8.048 & 25 \\
+  \hhline{~----} & $10^4$ & 0.29 & 13.104 & 109 \\
+  
+  \hhline{~----} & $10^5$ & 0.26 & 17.294 & 644 \\
+  
+  \hhline{~----} & $10^6$ & 0.23 & 24.579 & 8397 \\
+  \hline
+  \end{tabular}
+  \end{center}
+  \caption{Results of IBM Model 1 aligner with different sizes}
+  \label{tab:ibm-size}
+\end{table}
+
+\section{Hidden Markov Model Aligner}
+\subsection{Overview}
+HMM makes the independence assumption and the Markov assumption. The independence assumption says that each $f_j$ depends only on $a_j$; the Markov assumption says that for each $j > 0$, $a_j$ depends only on $a_{j_1}$. Specially, $a_0$ has a prior distribution. By these assumptions, $P(a, \mathbf{f}|\mathbf{e})$ can be rewritten as follows
+\[
+  P(a_0|\mathbf{e})\cdot\prod\limits_{j=1}^{J-1}P(a_j|a_{j-1},\mathbf{e})\cdot \prod\limits_{j=0}^{J-1}P(f_j|a_j,\mathbf{e})
+\] 
+We define 
+\[ 
+  P(a_j|a_{j-1}) = 
+  \begin{cases} 
+    \dfrac{(1-\varepsilon)\psi_{|a_j-a_{j-1}|}}{Z_j} & a_j \in [0,I-1] \\
+    \varepsilon & a_j = \text{NULL} \\
+    0 & \text{otherwise}
+  \end{cases}
+\] where $Z_j = \sum\limits_{i=0}^{I-1}\psi_{i-a_j-1}$, and select a fixed approximation of $\psi$ as follows
+\[
+  \psi_{i-a_j-1}\propto \exp (-\lambda (i-j-\eta))
+\] We use EM algorithm to train our model, with Baum-Welch \cite{baum1970maximization} algorithm for the updating strategy.
+
+\subsection{Implementation}
+We implemented an intersected HMM with $\lambda = 1.7$, $\eta = 1.1$, $\varepsilon = 0.9$, and about 5 training iterations (depending on the converging tolerance). To check convergence, we compare the old and new emission probability table, count the number of elements with differences less than 1e-5, denoted as $n_c$, and finally compute the ratio between $n_c$ and the total number of elements, denoted as $n_t$. If $1-n_c/n_t < 0.05$, we consider the model is converged.
+
+\subsection{Hyper-parameters}
+\subsubsection{Training dataset size}
+Table \ref{tab:hmm-size} is the comparison between the single model and the intersected model with different sizes of the training dataset. As we see, the intersected model can remarkably improve AER but seems to reduce BLEU a little bit. Because the intersected model needs to train two single models from different translating directions, the training time roughly doubles\footnote{The intersected model took pretty more than double time of the single model when it was trained by $10^6$ dataset. We think the reason is that the program needs more memory than the physical memory (16G) of our computer, so the operating system (macOS 10.14.1) has to read and write the hard drive frequently to carefully allocate memory, so as to make the program much slower.}. And we also observed that AER is inversely proportional to the exponent of the data size and BLEU is proportional to the exponent of the data size.
+\begin{table}[h!]
+  \begin{center}
+  \begin{tabular}{|c|c|c|c|c|}
+  \hline 
+  \bf Model & \bf Size &\bf AER & \bf BLEU & \bf Time(s) \\ 
+  \hline
+  \multirow{4}{*}{Single} & $10^3$ & 0.32 & 10.799 & 5 \\
+  \hhline{~----} & $10^4$ & 0.24 & 19.415 & 32 \\
+  
+  \hhline{~----} & $10^5$ & 0.19 & 22.166 & 242 \\
+  
+  \hhline{~----} & $10^6$ & 0.18 & 29.330 & 1971 \\
+  \hline
+  \multirow{4}{*}{Intersected} & $10^3$ & 0.21 & 10.233 & 9 \\
+  \hhline{~----} & $10^4$ & 0.17 & 19.062 & 69 \\
+  
+  \hhline{~----} & $10^5$ & 0.14 & 22.816 & 523 \\
+  
+  \hhline{~----} & $10^6$ & 0.11 & 29.523 & 6570 \\
+  \hline
+  \end{tabular}
+  \end{center}
+  \caption{Results of HMM aligner with different sizes}
+  \label{tab:hmm-size}
+\end{table}
+
+\subsubsection{$\lambda$ and $\eta$}
+We tried different combinations of $\lambda$ and $\eta$ as Table \ref{tab:hmm-ldb} shows. Changing these two parameters does not affect results very much.
+
+\begin{table}[h!]
+  \begin{center}
+  \begin{tabular}{|c|c|c||c|c|c|}
+  \hline 
+  \makecell{$\lambda$\\ ($\eta$=1.1)} & \bf AER &\bf BLEU & \makecell{$\eta$\\ ($\lambda$=1.7)} & \bf AER &\bf BLEU \\ 
+  \hline
+  1.5 & 0.175 & 18.76 & 0.9 & 0.178 & 19.02 \\
+  \hline
+  1.6 & 0.174 & 19.19 & 1.0 & 0.174 & 19.16\\
+  \hline
+  1.7 & 0.172 & 19.06 & 1.1 & 0.172 & 19.06\\
+  \hline
+  1.8 & 0.176 & 19.13 & 1.2 & 0.173 & 18.97\\
+  \hline
+  1.9 & 0.179 & 18.97 & 1.3 & 0.175 & 18.84\\
+  \hline
+  \end{tabular}
+  \end{center}
+  \caption{Results with different $\lambda$ and $\eta$}
+  \label{tab:hmm-ldb}
+\end{table}
+
+\subsubsection{NULL Likelihood $\varepsilon$}
+We tried different $\varepsilon$ as Table \ref{tab:hmm-ep} shows. It it obvious that AER slowly decreases with $\varepsilon$ going up. When $\varepsilon = 0.9$, AER is the lowest and BLEU is relatively high. However, after that, AER starts increasing and BLEU starts decreasing. When $\varepsilon = 1.0$, AER explodes.
+
+\begin{table}[h!]
+  \begin{center}
+  \begin{tabular}{|c|c|c||c|c|c|}
+  \hline 
+  $\varepsilon$ & \bf AER &\bf BLEU & $\varepsilon$ & \bf AER &\bf BLEU \\ 
+  \hline
+  0.1 & 0.183 & 18.92 & 0.8 & 0.177 & 18.92 \\
+  \hline
+  0.2 & 0.182 & 19.19 & 0.9 & 0.172 & 19.06\\
+  \hline
+  0.3 & 0.179 & 18.82 & 0.95 & 0.176 & 18.97\\
+  \hline
+  0.4 & 0.178 & 18.94 & 0.99 & 0.178 & 19.13\\
+  \hline
+  0.5 & 0.177 & 18.92 & 0.995 & 0.180 & 18.22\\
+  \hline
+  0.6 & 0.178 & 19.02 & 0.999 & 0.183 & 17.56\\
+  \hline
+  0.7 & 0.177 & 19.11 & 1.0 & 1.0 & 2.19\\
+  \hline
+  \end{tabular}
+  \end{center}
+  \caption{Results with different $\varepsilon$}
+  \label{tab:hmm-ep}
+\end{table}
+
+\bibliographystyle{apalike}
+\bibliography{acl2018}
+
+\end{document}
